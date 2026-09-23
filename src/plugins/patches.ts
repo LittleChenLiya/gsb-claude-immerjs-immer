@@ -2,6 +2,8 @@ import {immerable} from "../immer"
 import {
 	ImmerState,
 	Patch,
+	RebasePatchConflict,
+	RebasePatchesResult,
 	SetState,
 	ProxyArrayState,
 	MapState,
@@ -429,4 +431,389 @@ export function enablePatches() {
 		generateReplacementPatches_,
 		getPath
 	})
+}
+
+type ArrayToken =
+	| {kind: "base"; id: number}
+	| {kind: "insert"; side: 0 | 1; seq: number; gap: number; ord: number}
+
+type NormSegment = string | number | ArrayToken
+
+interface NormOp {
+	index: number
+	op: "replace" | "add" | "remove"
+	path: NormSegment[]
+	value: any
+	dup: boolean
+}
+
+interface ArraySim {
+	tokens: ArrayToken[]
+	baseTokens: ArrayToken[]
+	baseLength: number
+}
+
+function dieRebaseMapSet(): never {
+	throw new Error("rebasePatches does not support Map/Set patches")
+}
+
+function assertNoMapSetPatches(base: any, patches: readonly Patch[]): void {
+	if (isMap(base) || isSet(base)) dieRebaseMapSet()
+	for (const patch of patches) {
+		if (isMap(patch.value) || isSet(patch.value)) dieRebaseMapSet()
+		let cur = base
+		for (const seg of patch.path) {
+			if (cur === null || cur === undefined) break
+			cur = cur[seg as any]
+			if (isMap(cur) || isSet(cur)) dieRebaseMapSet()
+		}
+	}
+}
+
+function cloneRebaseValue<T>(value: T): T {
+	if (!isDraftable(value)) return value
+	if (isArray(value)) return value.map(cloneRebaseValue) as any
+	const cloned = Object.create(getPrototypeOf(value))
+	for (const key in value) cloned[key] = cloneRebaseValue((value as any)[key])
+	return cloned
+}
+
+function rebaseValuesEqual(a: any, b: any): boolean {
+	if (a === b) return true
+	if (!isObjectish(a) || !isObjectish(b)) return false
+	if (isArray(a) !== isArray(b)) return false
+	const aKeys = Object.keys(a)
+	const bKeys = Object.keys(b)
+	if (aKeys.length !== bKeys.length) return false
+	for (const key of aKeys) {
+		if (!has(b, key) || !rebaseValuesEqual(a[key], b[key])) return false
+	}
+	return true
+}
+
+function isTokenSegment(seg: NormSegment): seg is ArrayToken {
+	return typeof seg === "object"
+}
+
+function segmentsEqual(a: NormSegment, b: NormSegment): boolean {
+	const aIsToken = isTokenSegment(a)
+	const bIsToken = isTokenSegment(b)
+	if (aIsToken !== bIsToken) return false
+	if (!aIsToken || !bIsToken) return "" + a === "" + (b as any)
+	if (a.kind !== b.kind) return false
+	if (a.kind === "base" && b.kind === "base") return a.id === b.id
+	return a === b
+}
+
+function tokensEqual(a: ArrayToken, b: ArrayToken): boolean {
+	if (a.kind !== b.kind) return false
+	if (a.kind === "base" && b.kind === "base") return a.id === b.id
+	return a === b
+}
+
+// Sort order inside a merged array: base elements by id; inserts sort before
+// the base element at their gap, local inserts before incoming inserts.
+function compareTokens(a: ArrayToken, b: ArrayToken): number {
+	const ka: [number, number, number] =
+		a.kind === "base" ? [a.id, 2, 0] : [a.gap, a.side, a.ord]
+	const kb: [number, number, number] =
+		b.kind === "base" ? [b.id, 2, 0] : [b.gap, b.side, b.ord]
+	for (let i = 0; i < 3; i++) {
+		if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1
+	}
+	return 0
+}
+
+function arrayKeyOf(path: NormSegment[]): string {
+	return JSON.stringify(
+		path.map(seg =>
+			isTokenSegment(seg)
+				? seg.kind === "base"
+					? ["b", seg.id]
+					: ["i", seg.side, seg.seq]
+				: ["k", "" + seg]
+		)
+	)
+}
+
+function plainPath(path: NormSegment[]): PatchPath {
+	return path.map(seg =>
+		isTokenSegment(seg) ? (seg.kind === "base" ? seg.id : seg.gap) : seg
+	)
+}
+
+function normalizeRebaseOps(
+	base: any,
+	patches: readonly Patch[],
+	side: 0 | 1,
+	sims: Map<string, ArraySim>
+): NormOp[] {
+	let seq = 0
+	const ops: NormOp[] = []
+	for (let index = 0; index < patches.length; index++) {
+		const patch = patches[index]
+		const normPath: NormSegment[] = []
+		let cur = base
+		for (let i = 0; i < patch.path.length; i++) {
+			const isLast = i === patch.path.length - 1
+			if (isArray(cur)) {
+				const key = arrayKeyOf(normPath)
+				let sim = sims.get(key)
+				if (!sim) {
+					const baseTokens: ArrayToken[] = []
+					for (let id = 0; id < cur.length; id++) {
+						baseTokens.push({kind: "base", id})
+					}
+					sim = {
+						tokens: baseTokens.slice(),
+						baseTokens,
+						baseLength: cur.length
+					}
+					sims.set(key, sim)
+				}
+				const rawSeg = patch.path[i]
+				const idx = rawSeg === "-" ? sim.tokens.length : Number(rawSeg)
+				if (isLast && patch.op === "add") {
+					let gap = sim.baseLength
+					if (idx < sim.tokens.length) {
+						const next = sim.tokens[idx]
+						gap = next.kind === "base" ? next.id : next.gap
+					}
+					const token: ArrayToken = {kind: "insert", side, seq: seq++, gap, ord: 0}
+					sim.tokens.splice(idx, 0, token)
+					normPath.push(token)
+				} else {
+					const token = sim.tokens[idx]
+					if (token === undefined) {
+						normPath.push(rawSeg)
+						cur = undefined
+						continue
+					}
+					normPath.push(token)
+					if (isLast && patch.op === "remove") sim.tokens.splice(idx, 1)
+					cur = token.kind === "base" ? cur[token.id] : undefined
+				}
+			} else {
+				const seg = patch.path[i]
+				normPath.push(seg)
+				cur = cur === null || cur === undefined ? undefined : cur[seg as any]
+			}
+		}
+		ops.push({index, op: patch.op, path: normPath, value: patch.value, dup: false})
+	}
+	// Record final per-side order of insert tokens for stable merge ordering
+	sims.forEach(sim => {
+		sim.tokens.forEach((token, i) => {
+			if (token.kind === "insert") token.ord = i
+		})
+	})
+	return ops
+}
+
+type PathRelation = "equal" | "ancestor" | "descendant" | "disjoint"
+
+function relatePaths(a: NormSegment[], b: NormSegment[]): PathRelation {
+	const len = Math.min(a.length, b.length)
+	for (let i = 0; i < len; i++) {
+		if (!segmentsEqual(a[i], b[i])) return "disjoint"
+	}
+	if (a.length === b.length) return "equal"
+	return a.length < b.length ? "ancestor" : "descendant"
+}
+
+function applyToShadow(root: any, patch: Patch): any {
+	const value = cloneRebaseValue(patch.value)
+	if (patch.path.length === 0) {
+		return patch.op === "remove" ? undefined : value
+	}
+	let cur = root
+	for (let i = 0; i < patch.path.length - 1; i++) {
+		cur = cur[patch.path[i] as any]
+	}
+	const key = patch.path[patch.path.length - 1]
+	if (isArray(cur)) {
+		if (patch.op === "add") {
+			cur.splice((key as any) === "-" ? cur.length : Number(key), 0, value)
+		} else if (patch.op === "remove") {
+			cur.splice(Number(key), 1)
+		} else {
+			cur[key as any] = value
+		}
+	} else {
+		if (patch.op === "remove") delete cur[key]
+		else cur[key] = value
+	}
+	return root
+}
+
+function resolveShadowValue(root: any, path: (string | number)[]): any {
+	let cur = root
+	for (const seg of path) cur = cur[seg as any]
+	return cur
+}
+
+/**
+ * Rebases `incomingPatches` (produced from `base`) so they can be applied on
+ * top of the result of applying `localPatches` to `base`.
+ *
+ * Only plain object and array patches are supported; patches touching Maps or
+ * Sets are rejected. Neither `base` nor the passed patch lists are modified.
+ *
+ * When conflicts are found, no applicable patches are returned and every
+ * conflict reports the indices of the conflicting operations on both sides
+ * plus the conflicting path in base-state coordinates.
+ */
+export function rebasePatches(
+	base: any,
+	localPatches: readonly Patch[],
+	incomingPatches: readonly Patch[]
+): RebasePatchesResult {
+	assertNoMapSetPatches(base, localPatches)
+	assertNoMapSetPatches(base, incomingPatches)
+
+	const localSims = new Map<string, ArraySim>()
+	const incomingSims = new Map<string, ArraySim>()
+	const localOps = normalizeRebaseOps(base, localPatches, 0, localSims)
+	const incomingOps = normalizeRebaseOps(base, incomingPatches, 1, incomingSims)
+
+	const conflicts: RebasePatchConflict[] = []
+	const addConflict = (
+		lop: NormOp,
+		iop: NormOp,
+		path: NormSegment[],
+		reason: string
+	) => {
+		conflicts.push({
+			localIndex: lop.index,
+			incomingIndex: iop.index,
+			path: plainPath(path),
+			reason
+		})
+	}
+
+	for (const iop of incomingOps) {
+		for (const lop of localOps) {
+			const relation = relatePaths(iop.path, lop.path)
+			if (relation === "disjoint") continue
+			if (relation === "equal") {
+				if (lop.op === "remove" && iop.op === "remove") {
+					iop.dup = true
+				} else if (lop.op === "remove" || iop.op === "remove") {
+					addConflict(
+						lop,
+						iop,
+						iop.path,
+						"one side removed this value while the other side modified it"
+					)
+				} else if (rebaseValuesEqual(lop.value, iop.value)) {
+					iop.dup = true
+				} else {
+					addConflict(
+						lop,
+						iop,
+						iop.path,
+						"both sides set the same path to different values"
+					)
+				}
+			} else {
+				const ancestor = relation === "ancestor" ? iop : lop
+				// An "add" of a container recreated identically on both sides is
+				// compatible with descendant modifications; the equal-path add
+				// pair itself is deduplicated or reported as conflict above.
+				if (ancestor.op === "add") continue
+				addConflict(
+					lop,
+					iop,
+					ancestor.path,
+					ancestor.op === "remove"
+						? "one side removed an ancestor while the other side modified a descendant"
+						: "one side replaced an ancestor while the other side modified a descendant"
+				)
+			}
+		}
+	}
+
+	if (conflicts.length > 0) {
+		return {patches: [], inversePatches: [], conflicts}
+	}
+
+	// Current merged token list per array: local result, then incoming ops
+	// are woven in one by one.
+	const currentLists = new Map<string, ArrayToken[]>()
+	localSims.forEach((sim, key) => currentLists.set(key, sim.tokens.slice()))
+	incomingSims.forEach((sim, key) => {
+		if (!currentLists.has(key)) currentLists.set(key, sim.baseTokens.slice())
+	})
+
+	// Shadow copy of base + local patches, used to compute exact inverse values
+	let shadow = cloneRebaseValue(base)
+	for (const patch of localPatches) {
+		shadow = applyToShadow(shadow, patch)
+	}
+
+	const patches: Patch[] = []
+	const inversePatches: Patch[] = []
+	for (const iop of incomingOps) {
+		if (iop.dup) continue
+		const emittedPath: (string | number)[] = []
+		for (let i = 0; i < iop.path.length; i++) {
+			const seg = iop.path[i]
+			if (!isTokenSegment(seg)) {
+				emittedPath.push(seg)
+				continue
+			}
+			const isLast = i === iop.path.length - 1
+			const list = currentLists.get(arrayKeyOf(iop.path.slice(0, i)))!
+			if (isLast && iop.op === "add") {
+				const pos = list.findIndex(token => compareTokens(token, seg) > 0)
+				const idx = pos === -1 ? list.length : pos
+				list.splice(idx, 0, seg)
+				emittedPath.push(idx)
+			} else {
+				const idx = list.findIndex(token => tokensEqual(token, seg))
+				if (idx === -1) {
+					// Defensive: cannot happen for valid, conflict-free input
+					conflicts.push({
+						localIndex: -1,
+						incomingIndex: iop.index,
+						path: plainPath(iop.path),
+						reason: "target element no longer exists after local patches"
+					})
+					break
+				}
+				if (isLast && iop.op === "remove") list.splice(idx, 1)
+				emittedPath.push(idx)
+			}
+		}
+		if (conflicts.length > 0) break
+		const emitted: Patch =
+			iop.op === "remove"
+				? {op: "remove", path: emittedPath}
+				: {op: iop.op, path: emittedPath, value: cloneRebaseValue(iop.value)}
+		patches.push(emitted)
+		if (iop.op === "add") {
+			inversePatches.unshift({op: "remove", path: emittedPath.slice()})
+		} else {
+			const before = resolveShadowValue(shadow, emittedPath)
+			inversePatches.unshift(
+				iop.op === "remove"
+					? {
+							op: "add",
+							path: emittedPath.slice(),
+							value: cloneRebaseValue(before)
+						}
+					: {
+							op: "replace",
+							path: emittedPath.slice(),
+							value: cloneRebaseValue(before)
+						}
+			)
+		}
+		shadow = applyToShadow(shadow, emitted)
+	}
+
+	if (conflicts.length > 0) {
+		return {patches: [], inversePatches: [], conflicts}
+	}
+	return {patches, inversePatches, conflicts}
 }

@@ -21,7 +21,9 @@ export {
 	DRAFTABLE as immerable,
 	freeze,
 	Objectish,
-	StrictMode
+	StrictMode,
+	RebasePatchConflict,
+	RebasePatchesResult
 } from "./internal"
 
 const immer = new Immer()
@@ -84,6 +86,21 @@ export const setUseStrictIteration =
  * This function is a producer, which means copy-on-write is in effect.
  */
 export const applyPatches = /* @__PURE__ */ immer.applyPatches.bind(immer)
+
+/**
+ * The `rebasePatches` function takes a base state and two patch lists that
+ * were both produced from that base. It transforms `incomingPatches` so they
+ * can be applied on top of the result of `localPatches`, and also returns
+ * the inverse patches (restoring the exact local state) and a conflict list.
+ * If any conflict exists, no applicable patches are returned.
+ *
+ * Note: This function is __bound__ to its `Immer` instance.
+ *
+ * @param {any} base - the common base state both patch lists were created from
+ * @param {Patch[]} localPatches - the patches that are already applied
+ * @param {Patch[]} incomingPatches - the patches to rebase onto the local result
+ */
+export const rebasePatches = /* @__PURE__ */ immer.rebasePatches.bind(immer)
 
 /**
  * Create an Immer draft from the given base state, which may be a draft itself.

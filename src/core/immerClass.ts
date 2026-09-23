@@ -34,8 +34,10 @@ import {
 	isFunction,
 	isBoolean,
 	PluginMapSet,
-	PluginPatches
+	PluginPatches,
+	RebasePatchesResult
 } from "../internal"
+import {rebasePatches as rebasePatchesImpl} from "../plugins/patches"
 
 interface ProducersFns {
 	produce: IProduce
@@ -228,6 +230,24 @@ export class Immer implements ProducersFns {
 		return this.produce(base, (draft: Drafted) =>
 			applyPatchesImpl(draft, patches)
 		)
+	}
+
+	/**
+	 * Rebases `incomingPatches` (created from `base`) so they can be applied
+	 * on top of the result of applying `localPatches` to `base`. Returns the
+	 * rebased patches, their inverse (which restores the exact local state),
+	 * and the list of conflicts. When any conflict exists, no applicable
+	 * patches are returned.
+	 *
+	 * Only plain object and array patches are supported; Map/Set patches are
+	 * rejected. Neither `base` nor the passed patch lists are modified.
+	 */
+	rebasePatches<T extends Objectish>(
+		base: T,
+		localPatches: readonly Patch[],
+		incomingPatches: readonly Patch[]
+	): RebasePatchesResult {
+		return rebasePatchesImpl(base, localPatches, incomingPatches)
 	}
 }
 
