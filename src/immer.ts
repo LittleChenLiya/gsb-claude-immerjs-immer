@@ -12,6 +12,8 @@ export {
 	Immutable,
 	Patch,
 	PatchListener,
+	RebaseConflict,
+	RebaseResult,
 	Producer,
 	original,
 	current,
@@ -84,6 +86,14 @@ export const setUseStrictIteration =
  * This function is a producer, which means copy-on-write is in effect.
  */
 export const applyPatches = /* @__PURE__ */ immer.applyPatches.bind(immer)
+
+/**
+ * Rebase `incomingPatches` (created from the same `base` as
+ * `localPatches`) so they can be applied on top of the local result.
+ * Returns the rebased patches, their inverse patches, and a list of
+ * conflicts. Requires `enablePatches()`.
+ */
+export const rebasePatches = /* @__PURE__ */ immer.rebasePatches.bind(immer)
 
 /**
  * Create an Immer draft from the given base state, which may be a draft itself.

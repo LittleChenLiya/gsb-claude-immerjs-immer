@@ -91,6 +91,32 @@ export interface Patch {
 	value?: any
 }
 
+/**
+ * A conflict detected while rebasing incoming patches on top of
+ * local patches in rebasePatches.
+ */
+export interface RebaseConflict {
+	/** Index of the conflicting patch in the localPatches input array */
+	localIndex: number
+	/** Index of the conflicting patch in the incomingPatches input array */
+	incomingIndex: number
+	/** Path of the conflict, expressed in base-state coordinates */
+	path: Patch["path"]
+	/** Machine-readable conflict reason */
+	reason: string
+}
+
+/**
+ * Result of rebasePatches. When conflicts is non-empty, patches and
+ * inversePatches are empty. Otherwise patches applies on top of the
+ * local result, and inversePatches restores the local result exactly.
+ */
+export interface RebaseResult {
+	patches: Patch[]
+	inversePatches: Patch[]
+	conflicts: RebaseConflict[]
+}
+
 export type PatchListener = (patches: Patch[], inversePatches: Patch[]) => void
 
 /** Converts `nothing` into `undefined` */

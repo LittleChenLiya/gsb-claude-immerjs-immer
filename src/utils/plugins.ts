@@ -8,7 +8,8 @@ import {
 	ArchType,
 	die,
 	ImmerScope,
-	ProxyArrayState
+	ProxyArrayState,
+	RebaseResult
 } from "../internal"
 
 export const PluginMapSet = "MapSet"
@@ -27,6 +28,12 @@ export type PatchesPlugin = {
 		rootScope: ImmerScope
 	): void
 	applyPatches_<T>(draft: T, patches: readonly Patch[]): T
+	rebasePatches_(
+		base: any,
+		localState: any,
+		localPatches: readonly Patch[],
+		incomingPatches: readonly Patch[]
+	): RebaseResult
 	getPath: (state: ImmerState) => PatchPath | null
 }
 

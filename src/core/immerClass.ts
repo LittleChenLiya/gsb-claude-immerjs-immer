@@ -7,6 +7,7 @@ import {
 	processResult,
 	Patch,
 	Objectish,
+	RebaseResult,
 	DRAFT_STATE,
 	Draft,
 	PatchListener,
@@ -228,6 +229,28 @@ export class Immer implements ProducersFns {
 		return this.produce(base, (draft: Drafted) =>
 			applyPatchesImpl(draft, patches)
 		)
+	}
+
+	/**
+	 * Rebase `incomingPatches` (created from the same `base` as
+	 * `localPatches`) so they can be applied on top of the local result.
+	 *
+	 * Returns the rebased patches, their inverse patches (which restore
+	 * the local result exactly), and a list of conflicts. When any
+	 * conflict is detected, no applicable patches are returned.
+	 *
+	 * First version: only plain objects and arrays are supported;
+	 * Map/Set patches are rejected. Neither `base` nor the passed patch
+	 * arrays are modified.
+	 */
+	rebasePatches<T extends Objectish>(
+		base: T,
+		localPatches: readonly Patch[],
+		incomingPatches: readonly Patch[]
+	): RebaseResult {
+		const rebaseImpl = getPlugin(PluginPatches).rebasePatches_
+		const localState = this.applyPatches(base, localPatches)
+		return rebaseImpl(base, localState, localPatches, incomingPatches)
 	}
 }
 
