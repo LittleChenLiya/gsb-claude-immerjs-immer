@@ -121,3 +121,13 @@ export {Immer}
 export {enablePatches} from "./plugins/patches"
 export {enableMapSet} from "./plugins/mapset"
 export {enableArrayMethods} from "./plugins/arrayMethods"
+
+export {
+	createProduceObserver,
+	ObservationEvent,
+	ObservationListener,
+	ObservedProduceResult,
+	ObserverPath,
+	ObserverPathSegment,
+	ProduceObserver
+} from "./observe"

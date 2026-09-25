@@ -16,6 +16,7 @@ module.exports = {
 			"current",
 			"original",
 			"patches",
+			"produce-observer",
 			"freezing",
 			"return",
 			"async",
