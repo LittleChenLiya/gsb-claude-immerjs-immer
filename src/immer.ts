@@ -121,3 +121,5 @@ export {Immer}
 export {enablePatches} from "./plugins/patches"
 export {enableMapSet} from "./plugins/mapset"
 export {enableArrayMethods} from "./plugins/arrayMethods"
+export {createHistory} from "./plugins/history"
+export type {History, HistoryEntry, HistoryOptions} from "./plugins/history"
