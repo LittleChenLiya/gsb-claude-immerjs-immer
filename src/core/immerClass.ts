@@ -229,6 +229,70 @@ export class Immer implements ProducersFns {
 			applyPatchesImpl(draft, patches)
 		)
 	}
+
+	/**
+	 * Compacts a sequence of patches into an equivalent, minimal sequence.
+	 *
+	 * Returns a tuple of the compacted patches and their inverse patches.
+	 * Applying the compacted patches to `base` produces the same result as
+	 * applying the original `patches` in order, and applying the inverse
+	 * patches to that result restores `base`.
+	 *
+	 * Compaction is semantic rather than textual: the patches are replayed on
+	 * a draft of `base` and the net changes are re-generated, so repeated
+	 * writes to the same path are merged, changes that cancel out (like adding
+	 * and then removing the same key) are dropped, and array index drift,
+	 * replacements of parent paths and Map/Set operations are all handled
+	 * according to the regular patch semantics.
+	 *
+	 * Requires the patches plugin to be enabled via `enablePatches()`.
+	 */
+	compactPatches<T>(base: T, patches: readonly Patch[]): [Patch[], Patch[]] {
+		// If a patch replaces the entire state, everything before the last
+		// such replacement is irrelevant. This mirrors `applyPatches`.
+		let i: number
+		for (i = patches.length - 1; i >= 0; i--) {
+			const patch = patches[i]
+			if (patch.path.length === 0 && patch.op === "replace") {
+				break
+			}
+		}
+
+		if (i > -1) {
+			const replacement = patches[i].value
+			const [compacted, inverse] = this.compactPatches(
+				replacement,
+				patches.slice(i + 1)
+			)
+			return [
+				[{op: "replace", path: [], value: replacement}, ...compacted],
+				[...inverse, {op: "replace", path: [], value: base}]
+			]
+		}
+
+		if (patches.length === 0) {
+			return [[], []]
+		}
+
+		if (!isDraftable(base)) {
+			// A non-draftable base can only be changed through a root
+			// replacement (handled above). Anything else is invalid input;
+			// delegate to `applyPatches` to preserve its error behavior.
+			this.applyPatches(base as any, patches)
+			return [[], []]
+		}
+
+		// Replay the patches on a draft of `base` and let the regular patch
+		// generation compute the net changes.
+		const applyPatchesImpl = getPlugin(PluginPatches).applyPatches_
+		const [, compacted, inverse] = this.produceWithPatches(
+			base,
+			(draft: Drafted) => {
+				applyPatchesImpl(draft, patches)
+			}
+		)
+		return [compacted, inverse]
+	}
 }
 
 export function createProxy<T extends Objectish>(

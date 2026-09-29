@@ -86,6 +86,18 @@ export const setUseStrictIteration =
 export const applyPatches = /* @__PURE__ */ immer.applyPatches.bind(immer)
 
 /**
+ * Compacts a sequence of patches into an equivalent, minimal sequence.
+ *
+ * Returns a tuple of the compacted patches and their inverse patches.
+ * Applying the compacted patches to the base state produces the same result
+ * as applying the original patches in order, and applying the inverse
+ * patches to that result restores the base state.
+ *
+ * Note: This function is __bound__ to its `Immer` instance.
+ */
+export const compactPatches = /* @__PURE__ */ immer.compactPatches.bind(immer)
+
+/**
  * Create an Immer draft from the given base state, which may be a draft itself.
  * The draft can be modified until you finalize it with the `finishDraft` function.
  */
