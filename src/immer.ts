@@ -86,6 +86,24 @@ export const setUseStrictIteration =
 export const applyPatches = /* @__PURE__ */ immer.applyPatches.bind(immer)
 
 /**
+ * Takes a base state and a sequence of patches, and returns a compacted
+ * `[patches, inversePatches]` tuple.
+ *
+ * The compacted patches describe the same state transition as the original
+ * sequence: redundant operations are collapsed, e.g. consecutive writes to
+ * the same location are merged into the final write, and changes that are
+ * undone later in the sequence (like adding and then removing the same
+ * key) are dropped. Compaction is semantic, not textual: array index
+ * shifts caused by inserts/removes, replacement of parent paths, and
+ * Map/Set patches are all handled according to the normal patch semantics.
+ *
+ * Applying the returned patches to `base` yields the same result as
+ * applying the original sequence, and applying the returned inverse
+ * patches to that result restores `base`.
+ */
+export const compactPatches = /* @__PURE__ */ immer.compactPatches.bind(immer)
+
+/**
  * Create an Immer draft from the given base state, which may be a draft itself.
  * The draft can be modified until you finalize it with the `finishDraft` function.
  */

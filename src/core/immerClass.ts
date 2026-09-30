@@ -229,6 +229,34 @@ export class Immer implements ProducersFns {
 			applyPatchesImpl(draft, patches)
 		)
 	}
+
+	/**
+	 * Takes a base state and a sequence of patches, and returns a compacted
+	 * `[patches, inversePatches]` tuple.
+	 *
+	 * The compacted patches describe the same state transition as the original
+	 * sequence: redundant operations are collapsed, e.g. consecutive writes to
+	 * the same location are merged into the final write, and changes that are
+	 * undone later in the sequence (like adding and then removing the same
+	 * key) are dropped. Compaction is semantic, not textual: array index
+	 * shifts caused by inserts/removes, replacement of parent paths, and
+	 * Map/Set patches are all handled according to the normal patch semantics.
+	 *
+	 * Applying the returned patches to `base` yields the same result as
+	 * applying the original sequence, and applying the returned inverse
+	 * patches to that result restores `base`.
+	 */
+	compactPatches<T>(base: T, patches: readonly Patch[]): [Patch[], Patch[]] {
+		if (patches.length === 0) return [[], []]
+		// Replaying the sequence on a draft of `base` and diffing the outcome
+		// yields the minimal set of patches for the net effect of the sequence,
+		// plus the corresponding inverse patches.
+		const [, compactedPatches, inversePatches] = this.produceWithPatches(
+			base,
+			(draft: Drafted) => this.applyPatches(draft, patches)
+		)
+		return [compactedPatches, inversePatches]
+	}
 }
 
 export function createProxy<T extends Objectish>(

@@ -224,4 +224,28 @@ Which produces:
 
 For a more in-depth study, see [Distributing patches and rebasing actions using Immer](https://medium.com/@mweststrate/distributing-state-changes-using-snapshots-patches-and-actions-part-2-2f50d8363988)
 
+### `compactPatches`
+
+When patches are accumulated over time (for example by concatenating the patches of many `produceWithPatches` calls), the sequence often contains redundant operations: consecutive writes to the same location, or changes that are undone again later, like adding an item and removing it afterwards. `compactPatches` takes the base state and such a sequence of patches, and returns a compacted `[patches, inversePatches]` tuple. Applying the compacted patches to the base state yields the same result as applying the original sequence, and applying the returned inverse patches to that result restores the base state:
+
+```javascript
+import {compactPatches, applyPatches} from "immer"
+
+const base = {count: 0}
+const patches = [
+	{op: "replace", path: ["count"], value: 1},
+	{op: "replace", path: ["count"], value: 2},
+	{op: "add", path: ["temp"], value: true},
+	{op: "remove", path: ["temp"]}
+]
+
+const [compacted, inverse] = compactPatches(base, patches)
+// compacted: [{op: "replace", path: ["count"], value: 2}]
+// inverse: [{op: "replace", path: ["count"], value: 0}]
+
+applyPatches(base, compacted) // same as applyPatches(base, patches)
+```
+
+Compaction is semantic rather than textual: array index shifts caused by inserts and removals, replacement of parent paths, and `Map` / `Set` patches are all handled according to the normal patch semantics, so the compacted sequence is always equivalent to the original one.
+
 Tip: Check this trick to [compress patches](https://medium.com/@david.b.edelstein/using-immer-to-compress-immer-patches-f382835b6c69) produced over time.

@@ -13,6 +13,7 @@ title: API overview
 | `applyPatches` | Given a base state or draft, and a set of patches, applies the patches | [Patches](./patches.mdx) |
 | `castDraft` | Converts any immutable type to its mutable counterpart. This is just a cast and doesn't actually do anything. | [TypeScript](./typescript.mdx) |
 | `castImmutable` | Converts any mutable type to its immutable counterpart. This is just a cast and doesn't actually do anything. | [TypeScript](./typescript.mdx) |
+| `compactPatches` | Given a base state and a sequence of patches, returns a compacted `[patches, inversePatches]` tuple describing the same state transition | [Patches](./patches.mdx#compactpatches) |
 | `createDraft` | Given a base state, creates a mutable draft for which any modifications will be recorded | [Async](./async.mdx) |
 | `current` | Given a draft object (doesn't have to be a tree root), takes a snapshot of the current state of the draft | [Current](./current.md) |
 | `Draft<T>` | Exposed TypeScript type to convert an immutable type to a mutable type | [TypeScript](./typescript.mdx) |
