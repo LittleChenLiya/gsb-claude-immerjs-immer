@@ -121,3 +121,10 @@ export {Immer}
 export {enablePatches} from "./plugins/patches"
 export {enableMapSet} from "./plugins/mapset"
 export {enableArrayMethods} from "./plugins/arrayMethods"
+
+export {
+	collectReads,
+	ReadAccess,
+	ReadAccessType,
+	ReadAccessReport
+} from "./internal"
