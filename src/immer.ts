@@ -121,3 +121,14 @@ export {Immer}
 export {enablePatches} from "./plugins/patches"
 export {enableMapSet} from "./plugins/mapset"
 export {enableArrayMethods} from "./plugins/arrayMethods"
+export {
+	analyzePatchConflicts,
+	canMergePatches,
+	formatPatchConflicts,
+	PatchConflictReason
+} from "./patch-conflicts"
+export type {
+	PatchConflict,
+	PatchConflictReport,
+	PatchLocation
+} from "./patch-conflicts"
