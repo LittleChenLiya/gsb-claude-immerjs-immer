@@ -102,6 +102,16 @@ export const createDraft = /* @__PURE__ */ immer.createDraft.bind(immer)
 export const finishDraft = /* @__PURE__ */ immer.finishDraft.bind(immer)
 
 /**
+ * A session wrapper around the manual `createDraft` / `finishDraft` APIs.
+ * A session is opened, its draft mutated, and then either committed (with
+ * optional patches) or aborted (which revokes all of the session's drafts).
+ * Once closed, any further read, write or commit attempt throws a definite
+ * error.
+ */
+export {DraftSession} from "./core/draftSession"
+export type {DraftSessionState} from "./core/draftSession"
+
+/**
  * This function is actually a no-op, but can be used to cast an immutable type
  * to an draft type and make TypeScript happy
  *

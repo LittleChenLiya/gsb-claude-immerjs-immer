@@ -10,6 +10,7 @@ module.exports = {
 		],
 		"Advanced Features": [
 			"api",
+			"draft-session",
 			"map-set",
 			"array-methods",
 			"complex-objects",

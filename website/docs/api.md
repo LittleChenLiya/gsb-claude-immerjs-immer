@@ -20,6 +20,7 @@ title: API overview
 | `enableMapSet()` | Enables support for `Map` and `Set` collections. | [Installation](./installation.mdx#pick-your-immer-version) |
 | `enablePatches()` | Enables support for JSON patches. | [Installation](./installation#pick-your-immer-version) |
 | `finishDraft` | Given an draft created using `createDraft`, seals the draft and produces and returns the next immutable state that captures all the changes | [Async](./async.mdx) |
+| `DraftSession` | A session wrapper around `createDraft`/`finishDraft` with an explicit `open` → `committed`/`aborted` lifecycle; aborting revokes all of the session's drafts | [Draft sessions](./draft-session.md) |
 | `freeze(obj, deep?)` | Freezes draftable objects. Returns the original object. By default freezes shallowly, but if the second argument is `true` it will freeze recursively. |
 | `Immer` | constructor that can be used to create a second "immer" instance (exposing all APIs listed in this instance), that doesn't share its settings with global instance. |
 | `immerable` | Symbol that can be added to a constructor or prototype, to indicate that Immer should treat the class as something that can be safely drafted | [Classes](./complex-objects.md) |
