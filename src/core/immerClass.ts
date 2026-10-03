@@ -34,12 +34,119 @@ import {
 	isFunction,
 	isBoolean,
 	PluginMapSet,
-	PluginPatches
+	PluginPatches,
+	PatchCondition,
+	ApplyPatchesIfResult,
+	has,
+	get,
+	is,
+	getArchtype
 } from "../internal"
 
 interface ProducersFns {
 	produce: IProduce
 	produceWithPatches: IProduceWithPatches
+}
+
+/**
+ * Reads a property value without invoking accessor getters defined on the
+ * input. For Maps, `Map#get` is used (Maps cannot have getters). For objects
+ * and arrays, the own property descriptor is inspected first so that a getter
+ * with side effects is never called. Falls back to normal property access only
+ * for inherited properties.
+ */
+function readValueWithoutGetter(
+	obj: any,
+	key: PropertyKey,
+	archtype: ArchType
+): any {
+	if (archtype === ArchType.Map) return obj.get(key)
+	const desc = Object.getOwnPropertyDescriptor(obj, key)
+	if (desc) {
+		if ("value" in desc) return desc.value
+		// Accessor property: do not invoke the getter.
+		return undefined
+	}
+	return get(obj, key, archtype)
+}
+
+/**
+ * Resolves a path against the base state and reports whether the final key
+ * exists and, if so, its value. Returns `null` when the path cannot be
+ * resolved (a parent key is missing or not traversable).
+ *
+ * Existence is determined by own-property lookup (or `Map#has`), so a key
+ * whose value is `undefined` still counts as existing.
+ */
+function resolvePathForCondition(
+	base: any,
+	path: (string | number)[]
+): {exists: boolean; value: any} | null {
+	if (path.length === 0) return {exists: true, value: base}
+
+	let current = base
+	for (let i = 0; i < path.length; i++) {
+		const key = path[i]
+		const archtype = getArchtype(current)
+
+		if (i === path.length - 1) {
+			const exists = has(current, key, archtype)
+			const value = exists
+				? readValueWithoutGetter(current, key, archtype)
+				: undefined
+			return {exists, value}
+		}
+
+		if (!has(current, key, archtype)) return null
+		current = readValueWithoutGetter(current, key, archtype)
+		if (current === null || !isObjectish(current)) return null
+	}
+
+	return null
+}
+
+type ConditionFailReason =
+	| "not-exists"
+	| "exists"
+	| "value-mismatch"
+	| "invalid-path"
+
+/**
+ * Checks a single condition against the original base. All conditions are
+ * evaluated against the same base, never against intermediate patch results.
+ */
+function checkCondition(
+	base: any,
+	condition: PatchCondition,
+	patch: Patch | undefined
+):
+	| {ok: true}
+	| {ok: false; path: (string | number)[]; reason: ConditionFailReason} {
+	const path = condition.path ?? patch?.path ?? []
+
+	const resolved = resolvePathForCondition(base, path)
+	if (resolved === null) {
+		return {ok: false, path, reason: "invalid-path"}
+	}
+
+	const {exists, value} = resolved
+
+	if (condition.exists !== undefined) {
+		if (condition.exists && !exists) {
+			return {ok: false, path, reason: "not-exists"}
+		}
+		if (!condition.exists && exists) {
+			return {ok: false, path, reason: "exists"}
+		}
+	}
+
+	if (Object.prototype.hasOwnProperty.call(condition, "value") && exists) {
+		if (!is(value, condition.value)) {
+			return {ok: false, path, reason: "value-mismatch"}
+		}
+	}
+
+	return {ok: true}
 }
 
 export type StrictMode = boolean | "class_only"
@@ -228,6 +335,64 @@ export class Immer implements ProducersFns {
 		return this.produce(base, (draft: Drafted) =>
 			applyPatchesImpl(draft, patches)
 		)
+	}
+
+	/**
+	 * Atomically apply patches only when all preconditions hold against the
+	 * original base state.
+	 *
+	 * Every condition is checked against the same `base` before any patch is
+	 * applied. If any condition fails, the result is `{ok: false, path, reason}`
+	 * identifying the first failing condition, and **no patches are applied**.
+	 * If all conditions pass, the patches are applied via {@link applyPatches}
+	 * and the result is `{ok: true, result}`.
+	 *
+	 * This is useful for state synchronization: patches generated from stale
+	 * data can be rejected before they overwrite newer state.
+	 *
+	 * @param base - the original state to check conditions against and apply patches to
+	 * @param patches - the patches to apply
+	 * @param conditions - preconditions, one per patch (by index). Each condition
+	 *   may specify `path` (defaults to the patch's path), `exists`, and `value`.
+	 * @returns a discriminated result: `{ok: true, result}` on success, or
+	 *   `{ok: false, path, reason}` on failure.
+	 *
+	 * @example
+	 * ```ts
+	 * import {applyPatchesIf} from "immer"
+	 *
+	 * const base = {count: 2}
+	 *
+	 * // Success: the old value matches.
+	 * applyPatchesIf(base, [{op: "replace", path: ["count"], value: 3}], [
+	 *   {value: 2}
+	 * ])
+	 * // => {ok: true, result: {count: 3}}
+	 *
+	 * // Failure: the old value does not match, so nothing is applied.
+	 * applyPatchesIf(base, [{op: "replace", path: ["count"], value: 3}], [
+	 *   {value: 1}
+	 * ])
+	 * // => {ok: false, path: ["count"], reason: "value-mismatch"}
+	 * ```
+	 */
+	applyPatchesIf<T extends Objectish>(
+		base: T,
+		patches: readonly Patch[],
+		conditions: readonly PatchCondition[]
+	): ApplyPatchesIfResult<T> {
+		// Check all conditions against the same base first. No patches are
+		// applied until every condition passes.
+		for (let i = 0; i < conditions.length; i++) {
+			const check = checkCondition(base, conditions[i], patches[i])
+			if (!check.ok) {
+				return {ok: false, path: check.path, reason: check.reason}
+			}
+		}
+
+		// All conditions pass — apply the patches.
+		const result = this.applyPatches(base, patches)
+		return {ok: true, result}
 	}
 }
 

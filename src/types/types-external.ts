@@ -93,6 +93,48 @@ export interface Patch {
 
 export type PatchListener = (patches: Patch[], inversePatches: Patch[]) => void
 
+/**
+ * A precondition checked against the base state before any patch is applied.
+ *
+ * Each condition corresponds to a patch (by index). The `path` defaults to the
+ * patch's own path when omitted. All conditions are evaluated against the same
+ * original base — never against intermediate results — so a later patch's
+ * condition can never observe an earlier patch's effect.
+ */
+export type PatchCondition = {
+	/**
+	 * The path to check. Defaults to the corresponding patch's path.
+	 */
+	path?: (string | number)[]
+	/**
+	 * When `true`, the key must exist at the path. When `false`, the key must
+	 * not exist. Existence is determined by own-property lookup (or `Map#has`),
+	 * so a key whose value is `undefined` still counts as existing.
+	 */
+	exists?: boolean
+	/**
+	 * The expected old value at the path, compared with `Object.is`. Only
+	 * checked when the key exists and this field is present.
+	 */
+	value?: any
+}
+
+/**
+ * The result of {@link IProduce.applyPatchesIf}.
+ *
+ * On success, `ok` is `true` and `result` is the new state produced by
+ * applying the patches. On failure, `ok` is `false`, `path` identifies the
+ * first condition that failed, and `reason` explains why. No patches are
+ * applied when a condition fails.
+ */
+export type ApplyPatchesIfResult<T> =
+	| {ok: true; result: T}
+	| {
+			ok: false
+			path: (string | number)[]
+			reason: "not-exists" | "exists" | "value-mismatch" | "invalid-path"
+	  }
+
 /** Converts `nothing` into `undefined` */
 type FromNothing<T> = T extends typeof NOTHING ? undefined : T
 

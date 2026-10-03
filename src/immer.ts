@@ -12,6 +12,8 @@ export {
 	Immutable,
 	Patch,
 	PatchListener,
+	PatchCondition,
+	ApplyPatchesIfResult,
 	Producer,
 	original,
 	current,
@@ -84,6 +86,36 @@ export const setUseStrictIteration =
  * This function is a producer, which means copy-on-write is in effect.
  */
 export const applyPatches = /* @__PURE__ */ immer.applyPatches.bind(immer)
+
+/**
+ * Atomically apply patches only when all preconditions hold against the
+ * original base state.
+ *
+ * Every condition is checked against the same base before any patch is
+ * applied. If any condition fails, `{ok: false, path, reason}` is returned
+ * and no patches are applied. On success, `{ok: true, result}` is returned.
+ *
+ * Useful for state synchronization: patches generated from stale data can be
+ * rejected before they overwrite newer state.
+ *
+ * @example
+ * ```ts
+ * const base = {count: 2}
+ *
+ * // Success: the old value matches.
+ * applyPatchesIf(base, [{op: "replace", path: ["count"], value: 3}], [
+ *   {value: 2}
+ * ])
+ * // => {ok: true, result: {count: 3}}
+ *
+ * // Failure: the old value does not match, so nothing is applied.
+ * applyPatchesIf(base, [{op: "replace", path: ["count"], value: 3}], [
+ *   {value: 1}
+ * ])
+ * // => {ok: false, path: ["count"], reason: "value-mismatch"}
+ * ```
+ */
+export const applyPatchesIf = /* @__PURE__ */ immer.applyPatchesIf.bind(immer)
 
 /**
  * Create an Immer draft from the given base state, which may be a draft itself.
