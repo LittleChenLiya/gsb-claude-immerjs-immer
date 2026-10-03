@@ -21,8 +21,11 @@ export {
 	DRAFTABLE as immerable,
 	freeze,
 	Objectish,
-	StrictMode
+	StrictMode,
+	DraftSession
 } from "./internal"
+
+export type {DraftSessionStatus, DraftSessionCommit} from "./internal"
 
 const immer = new Immer()
 
@@ -100,6 +103,26 @@ export const createDraft = /* @__PURE__ */ immer.createDraft.bind(immer)
  * changes that were made.
  */
 export const finishDraft = /* @__PURE__ */ immer.finishDraft.bind(immer)
+
+/**
+ * Create a `DraftSession` for the given base state: an explicit
+ * open/commit/abort wrapper around `createDraft` / `finishDraft` for flows
+ * that need to review a draft before deciding whether to publish it.
+ *
+ * - `session.draft` is the modifiable draft, available while the session is
+ *   `open`.
+ * - `session.commit()` finalizes at most once and returns
+ *   `{result, patches, inversePatches}` (patches require `enablePatches()`).
+ * - `session.abort()` revokes every draft reference of the session and
+ *   discards all changes; the base state is never mutated.
+ *
+ * Once a session is closed (`committed` or `aborted`), any further read,
+ * write, commit or abort fails with a deterministic error.
+ *
+ * Note: This function is __bound__ to its `Immer` instance.
+ */
+export const createDraftSession =
+	/* @__PURE__ */ immer.createDraftSession.bind(immer)
 
 /**
  * This function is actually a no-op, but can be used to cast an immutable type

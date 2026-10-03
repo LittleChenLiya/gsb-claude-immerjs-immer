@@ -32,7 +32,15 @@ export const errors =
 				"Immer only supports setting array indices and the 'length' property",
 				function (thing: string) {
 					return `'original' expects a draft, got: ${thing}`
-				}
+				},
+				function (status: string) {
+					return (
+						`The draft session is already closed (status: '${status}'). ` +
+						"Its drafts have been revoked and can no longer be read, written, committed or aborted. " +
+						"Create a new draft session instead."
+					)
+				},
+				"The argument to `commit` must be a function or undefined"
 				// Note: if more errors are added, the errorOffset in Patches.ts should be increased
 				// See Patches.ts for additional errors
 			]

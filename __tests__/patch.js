@@ -1315,7 +1315,7 @@ test("do not allow __proto__ polution - 738", () => {
 		])
 	}).toThrow(
 		isProd
-			? "19"
+			? "21"
 			: "Patching reserved attributes like __proto__, prototype and constructor is not allowed"
 	)
 	// @ts-ignore
@@ -1337,7 +1337,7 @@ test("do not allow __proto__ polution using arrays - 738", () => {
 		)
 	}).toThrow(
 		isProd
-			? "19"
+			? "21"
 			: "Patching reserved attributes like __proto__, prototype and constructor is not allowed"
 	)
 	// @ts-ignore
@@ -1357,7 +1357,7 @@ test("do not allow prototype polution - 738", () => {
 		])
 	}).toThrow(
 		isProd
-			? "19"
+			? "21"
 			: "Patching reserved attributes like __proto__, prototype and constructor is not allowed"
 	)
 	// @ts-ignore
@@ -1387,7 +1387,7 @@ test("do not allow constructor.prototype polution - 738", () => {
 		])
 	}).toThrow(
 		isProd
-			? "19"
+			? "21"
 			: "Patching reserved attributes like __proto__, prototype and constructor is not allowed"
 	)
 	// @ts-ignore
@@ -1422,7 +1422,7 @@ test("CVE-2020-28477 (https://snyk.io/vuln/SNYK-JS-IMMER-1019369) follow up", ()
 		])
 	}).toThrow(
 		isProd
-			? "19"
+			? "21"
 			: "Patching reserved attributes like __proto__, prototype and constructor is not allowed"
 	)
 	// @ts-ignore
@@ -1603,5 +1603,5 @@ test("applyPatches throws proper immer error when intermediate path value is nul
 	const isProd = process.env.NODE_ENV === "production"
 	expect(() => {
 		applyPatches({a: null}, [{op: "add", path: ["a", "b"], value: 1}])
-	}).toThrow(isProd ? "18" : "Cannot apply patch, path doesn't resolve: a/b")
+	}).toThrow(isProd ? "20" : "Cannot apply patch, path doesn't resolve: a/b")
 })

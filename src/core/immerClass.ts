@@ -34,7 +34,8 @@ import {
 	isFunction,
 	isBoolean,
 	PluginMapSet,
-	PluginPatches
+	PluginPatches,
+	DraftSession
 } from "../internal"
 
 interface ProducersFns {
@@ -168,6 +169,16 @@ export class Immer implements ProducersFns {
 		const {scope_: scope} = state
 		usePatchesInScope(scope, patchListener)
 		return processResult(undefined, scope)
+	}
+
+	/**
+	 * Creates a `DraftSession` for the given base state: an explicit
+	 * open/commit/abort wrapper around `createDraft` / `finishDraft` for
+	 * flows that need to inspect a draft before deciding whether to publish
+	 * it. See `DraftSession` for the exact lifecycle guarantees.
+	 */
+	createDraftSession<T extends Objectish>(base: T): DraftSession<T> {
+		return new DraftSession(this, base)
 	}
 
 	/**

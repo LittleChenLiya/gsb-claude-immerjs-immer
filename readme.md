@@ -24,6 +24,8 @@ so that you can start coding straight away.
 
 The documentation of this package is hosted at https://immerjs.github.io/immer/
 
+Draft sessions (an explicit open/commit/abort wrapper around `createDraft` / `finishDraft`) are documented in [docs/draft-sessions.md](docs/draft-sessions.md).
+
 ## Support
 
 Did Immer make a difference to your project? Join the open collective at https://opencollective.com/immer!

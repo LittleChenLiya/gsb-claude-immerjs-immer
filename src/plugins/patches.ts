@@ -33,7 +33,7 @@ import {
 } from "../internal"
 
 export function enablePatches() {
-	const errorOffset = 16
+	const errorOffset = 18
 	if (process.env.NODE_ENV !== "production") {
 		errors.push(
 			'Sets cannot have "replace" patches.',
