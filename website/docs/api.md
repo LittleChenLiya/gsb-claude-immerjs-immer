@@ -11,6 +11,7 @@ title: API overview
 | --- | --- | --- |
 | `produce` | The core API of Immer: `import {produce} from "immer"` | [Produce](./produce.mdx) |
 | `applyPatches` | Given a base state or draft, and a set of patches, applies the patches | [Patches](./patches.mdx) |
+| `applyPatchesWithConditions` | Like `applyPatches`, but first checks existence/old-value preconditions against the same base and applies nothing when any condition fails | [Patches](./patches.mdx#applying-patches-atomically-with-preconditions) |
 | `castDraft` | Converts any immutable type to its mutable counterpart. This is just a cast and doesn't actually do anything. | [TypeScript](./typescript.mdx) |
 | `castImmutable` | Converts any mutable type to its immutable counterpart. This is just a cast and doesn't actually do anything. | [TypeScript](./typescript.mdx) |
 | `createDraft` | Given a base state, creates a mutable draft for which any modifications will be recorded | [Async](./async.mdx) |

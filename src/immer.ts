@@ -3,7 +3,12 @@ import {
 	IProduceWithPatches,
 	Immer,
 	Draft,
-	Immutable
+	Immutable,
+	Objectish,
+	Patch,
+	PatchCondition,
+	ApplyPatchesWithConditionsResult,
+	checkPatchConditions
 } from "./internal"
 
 export {
@@ -11,6 +16,10 @@ export {
 	WritableDraft,
 	Immutable,
 	Patch,
+	PatchCondition,
+	PatchConditionFailure,
+	PatchConditionFailureReason,
+	ApplyPatchesWithConditionsResult,
 	PatchListener,
 	Producer,
 	original,
@@ -84,6 +93,64 @@ export const setUseStrictIteration =
  * This function is a producer, which means copy-on-write is in effect.
  */
 export const applyPatches = /* @__PURE__ */ immer.applyPatches.bind(immer)
+
+/**
+ * Atomically apply `patches` to `base`, but only when every precondition in
+ * `conditions` holds for `base`.
+ *
+ * Each condition asserts the existence and/or the current ("old") value of a
+ * path in the base state. All conditions are first checked against the same,
+ * unmodified base — never against intermediate states produced by earlier
+ * patches — and only when all of them pass are the patches applied through
+ * the regular `applyPatches` semantics (objects, arrays and Maps are
+ * supported; the base itself is never mutated). A key that exists with the
+ * value `undefined` counts as existing and is never treated as a missing key.
+ * Condition checking only reads own-property descriptors and Map keys, so no
+ * getters defined on the input are invoked.
+ *
+ * When any condition fails, no patch is applied at all and the first failure
+ * is reported with its exact location (condition index, path and segment).
+ *
+ * Requires `enablePatches()` (and `enableMapSet()` for Map bases), just like
+ * `applyPatches`.
+ *
+ * @example All conditions hold — the patches are applied:
+ * ```ts
+ * applyPatchesWithConditions(
+ *   {count: 2},
+ *   [{op: "replace", path: ["count"], value: 3}],
+ *   [{path: ["count"], value: 2}] // expected old value
+ * )
+ * // => {applied: true, result: {count: 3}}
+ * ```
+ *
+ * @example A stale expectation rejects the whole batch atomically:
+ * ```ts
+ * applyPatchesWithConditions(
+ *   {count: 2},
+ *   [{op: "replace", path: ["count"], value: 3}],
+ *   [{path: ["count"], value: 1}] // base changed since we read it
+ * )
+ * // => {applied: false, failure: {conditionIndex: 0, path: ["count"],
+ * //      at: 0, reason: "value-mismatch", expected: 1, actual: 2}}
+ * ```
+ */
+export function applyPatchesWithConditions<T extends Objectish>(
+	base: T,
+	patches: readonly Patch[],
+	conditions: readonly PatchCondition[]
+): ApplyPatchesWithConditionsResult<T> {
+	if (!Array.isArray(conditions)) {
+		throw new Error(
+			"applyPatchesWithConditions: conditions must be an array of patch conditions"
+		)
+	}
+	const failure = checkPatchConditions(base, conditions)
+	if (failure) {
+		return {applied: false, failure}
+	}
+	return {applied: true, result: applyPatches(base, patches)}
+}
 
 /**
  * Create an Immer draft from the given base state, which may be a draft itself.

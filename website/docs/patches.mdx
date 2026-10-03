@@ -225,3 +225,52 @@ Which produces:
 For a more in-depth study, see [Distributing patches and rebasing actions using Immer](https://medium.com/@mweststrate/distributing-state-changes-using-snapshots-patches-and-actions-part-2-2f50d8363988)
 
 Tip: Check this trick to [compress patches](https://medium.com/@david.b.edelstein/using-immer-to-compress-immer-patches-f382835b6c69) produced over time.
+
+## Applying patches atomically with preconditions
+
+When patches were generated from a state that might have changed since (for
+example patches coming from another client or a stale snapshot), plain
+`applyPatches` would happily apply them on top of the wrong base.
+`applyPatchesWithConditions` guards against that: the caller provides one
+condition per path — its expected existence and/or old value — and all
+conditions are first checked against the same, unmodified base. Only when
+every condition holds are the patches applied, through the regular
+`applyPatches` semantics (objects, arrays and Maps are supported, the base is
+never mutated, and no getters on the input are invoked while checking). A key
+that exists with the value `undefined` counts as existing; it is never
+treated as a missing key.
+
+If any condition fails, _no_ patch is applied at all, and the result
+describes the first failing condition with its exact location:
+
+```javascript
+import {applyPatchesWithConditions} from "immer"
+
+// Success: the old value still matches, so the patch is applied
+applyPatchesWithConditions(
+	{count: 2},
+	[{op: "replace", path: ["count"], value: 3}],
+	[{path: ["count"], value: 2}] // expected old value
+)
+// {applied: true, result: {count: 3}}
+
+// Rejection: the base changed since the patch was created,
+// so nothing is applied
+applyPatchesWithConditions(
+	{count: 2},
+	[{op: "replace", path: ["count"], value: 3}],
+	[{path: ["count"], value: 1}] // stale expectation
+)
+// {applied: false, failure: {conditionIndex: 0, path: ["count"], at: 0,
+//   reason: "value-mismatch", expected: 1, actual: 2}}
+```
+
+Each condition is `{path, exists?, value?}`:
+
+- `exists` (default `true`) requires the path to be present (`false`
+  requires it to be absent).
+- `value` enables an old-value check whenever the `value` key is present on
+  the condition, so `{path, value: undefined}` asserts the key exists and
+  currently holds `undefined`.
+- An empty `path` addresses the base (root) itself, which pairs naturally
+  with a root `replace` patch.

@@ -93,6 +93,77 @@ export interface Patch {
 
 export type PatchListener = (patches: Patch[], inversePatches: Patch[]) => void
 
+/**
+ * A precondition checked by `applyPatchesWithConditions` before any patch is
+ * applied. All conditions of one call are checked against the same,
+ * unmodified base state.
+ *
+ * The `path` uses the same addressing as `Patch.path`: string/number keys for
+ * plain objects and arrays, Map keys for Maps, and an empty path for the base
+ * (root) itself.
+ */
+export interface PatchCondition {
+	/** Path into the base state. An empty path targets the base itself. */
+	path: (string | number)[]
+	/**
+	 * Expected existence of `path` in the base. Defaults to `true`.
+	 * Pass `false` to require the path to be absent.
+	 * A key that exists with the value `undefined` counts as existing;
+	 * it is never treated the same as a missing key.
+	 */
+	exists?: boolean
+	/**
+	 * Expected current ("old") value at `path`, compared with `Object.is`
+	 * semantics. The value check is only performed when the `value` property
+	 * is present on the condition object, so `{path, value: undefined}` is a
+	 * meaningful expectation (the key must exist and hold `undefined`).
+	 */
+	value?: unknown
+}
+
+/** Why a `PatchCondition` did not hold for the given base state. */
+export type PatchConditionFailureReason =
+	/** The path (or a segment of it) is absent, but was expected to exist */
+	| "missing"
+	/** The path exists, but was expected to be absent */
+	| "exists"
+	/** The current value differs from the expected old value */
+	| "value-mismatch"
+	/**
+	 * The path cannot be resolved: a non-string/number segment, a segment
+	 * that dives into a primitive/`null`, or an unsupported Set target
+	 */
+	| "invalid-path"
+	/**
+	 * Reading the value would require invoking an accessor (getter) on the
+	 * input, which condition checking never does
+	 */
+	| "getter"
+
+/** Describes the first condition that did not hold for the base state. */
+export interface PatchConditionFailure {
+	/** Index of the failed condition in the `conditions` array */
+	conditionIndex: number
+	/** Path of the failed condition */
+	path: (string | number)[]
+	/** Index of the path segment at which the check failed */
+	at: number
+	reason: PatchConditionFailureReason
+	/** The expected old value, for `value-mismatch` failures */
+	expected?: unknown
+	/** The actual current value, for `value-mismatch` failures */
+	actual?: unknown
+}
+
+/**
+ * Result of `applyPatchesWithConditions`: either all conditions held and the
+ * patches were applied atomically, or no patch was applied at all and the
+ * first failing condition is reported.
+ */
+export type ApplyPatchesWithConditionsResult<T> =
+	| {applied: true; result: T}
+	| {applied: false; failure: PatchConditionFailure}
+
 /** Converts `nothing` into `undefined` */
 type FromNothing<T> = T extends typeof NOTHING ? undefined : T
 
