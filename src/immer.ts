@@ -121,3 +121,12 @@ export {Immer}
 export {enablePatches} from "./plugins/patches"
 export {enableMapSet} from "./plugins/mapset"
 export {enableArrayMethods} from "./plugins/arrayMethods"
+
+export {createOptimisticContainer, VersionConflictError} from "./optimistic"
+export type {
+	OptimisticContainer,
+	OptimisticSnapshot,
+	OptimisticNotification,
+	OptimisticListener,
+	OptimisticRecipe
+} from "./optimistic"
