@@ -3,8 +3,10 @@ import {
 	IProduceWithPatches,
 	Immer,
 	Draft,
-	Immutable
+	Immutable,
+	Objectish
 } from "./internal"
+import {createOptimistic as createOptimisticImpl} from "./core/optimistic"
 
 export {
 	Draft,
@@ -23,6 +25,14 @@ export {
 	Objectish,
 	StrictMode
 } from "./internal"
+
+export type {
+	OptimisticContainer,
+	OptimisticRecipe,
+	OptimisticCommitResult,
+	OptimisticCommitStatus,
+	OptimisticListener
+} from "./core/optimistic"
 
 const immer = new Immer()
 
@@ -53,6 +63,22 @@ export const produce: IProduce = /* @__PURE__ */ immer.produce
  */
 export const produceWithPatches: IProduceWithPatches =
 	/* @__PURE__ */ immer.produceWithPatches.bind(immer)
+
+/**
+ * Create an immutable, versioned state container with optimistic concurrency
+ * control. Callers submit recipes together with the version they were based
+ * on; the version is checked before the recipe runs and again after it
+ * settles, so a stale recipe can never overwrite a state that was published
+ * in the meantime. Only successful commits bump the version and notify
+ * subscribers. Structural sharing and freezing are inherited from Immer.
+ *
+ * @param {any} initialState - the initial state, finalized (and frozen) by Immer
+ */
+export const createOptimistic = /* @__PURE__ */ function createOptimistic<
+	T extends Objectish
+>(initialState: T) {
+	return createOptimisticImpl(immer, initialState)
+}
 
 /**
  * Pass true to automatically freeze all copies created by Immer.
