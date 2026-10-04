@@ -85,9 +85,12 @@ export type Immutable<T> = T extends PrimitiveType
 						? {readonly [K in keyof T]: Immutable<T[K]>}
 						: T
 
+/** Single segment of a {@link Patch} path (object key or array index). */
+export type PatchSegment = string | number
+
 export interface Patch {
 	op: "replace" | "remove" | "add"
-	path: (string | number)[]
+	path: PatchSegment[]
 	value?: any
 }
 

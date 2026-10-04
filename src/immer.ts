@@ -3,7 +3,8 @@ import {
 	IProduceWithPatches,
 	Immer,
 	Draft,
-	Immutable
+	Immutable,
+	redactPatches as redactPatchesImpl
 } from "./internal"
 
 export {
@@ -11,7 +12,11 @@ export {
 	WritableDraft,
 	Immutable,
 	Patch,
+	PatchSegment,
 	PatchListener,
+	PatchRedactionRule,
+	RedactPatchesOptions,
+	PatchRedactionError,
 	Producer,
 	original,
 	current,
@@ -84,6 +89,21 @@ export const setUseStrictIteration =
  * This function is a producer, which means copy-on-write is in effect.
  */
 export const applyPatches = /* @__PURE__ */ immer.applyPatches.bind(immer)
+
+/**
+ * Return a detached, redacted copy of the given patches for audit logging.
+ *
+ * Patch ops and paths are always preserved (also for `remove` ops, which
+ * carry no value); the `value` at paths covered by a redaction rule is
+ * replaced with the rule's explicit marker, and every other value is deep
+ * copied so the result shares no mutable object with the input patches.
+ * Rules match path segments (parent rules mask the whole value subtree;
+ * numeric array segments are never string fields). The original patches are
+ * not modified, so they can still be replayed with `applyPatches`. Batches
+ * containing accessors or circular values are rejected wholesale.
+ */
+export const redactPatches: typeof redactPatchesImpl =
+	/* @__PURE__ */ redactPatchesImpl
 
 /**
  * Create an Immer draft from the given base state, which may be a draft itself.

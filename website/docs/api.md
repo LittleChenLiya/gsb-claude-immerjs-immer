@@ -29,7 +29,9 @@ title: API overview
 | `nothing` | Value that can be returned from a recipe, to indicate that the value `undefined` should be produced | [Return](./return.mdx) |
 | `original` | Given a draft object (doesn't have to be a tree root), returns the original object at the same path in the original state tree, if present | [Original](./original.md) |
 | `Patch` | Exposed TypeScript type, describes the shape of an (inverse) patch object | [Patches](./patches.mdx) |
+| `PatchRedactionRule`, `RedactPatchesOptions`, `PatchRedactionError` | Types for {@link redactPatches} and the error thrown when a batch cannot be redacted safely | [Audit patches](./audit-patches.mdx) |
 | `produceWithPatches` | Works the same as `produce`, but instead of just returning the produced object, it returns a tuple, consisting of `[result, patches, inversePatches]`. | [Patches](./patches.mdx) |
+| `redactPatches` | Returns a detached audit copy of patches: ops and paths are preserved, values at rule-covered paths are replaced with an explicit marker, and the input patches stay replayable | [Audit patches](./audit-patches.mdx) |
 | `setAutoFreeze` | Enables / disables automatic freezing of the trees produces. By default enabled. | [Freezing](./freezing.mdx) |
 | `setUseStrictShallowCopy` | Can be used to enable strict shallow copy. If enable, immer copies non-enumerable properties as much as possible. | [Classes](./complex-objects.md) |
 | `setUseStrictIteration` | Controls iteration behavior: pass `false` for loose iteration (enumerable properties only, better performance) or `true` for strict iteration (includes symbols and non-enumerable properties). By default disabled (loose iteration). |  |

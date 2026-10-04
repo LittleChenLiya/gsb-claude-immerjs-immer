@@ -6,6 +6,24 @@ export interface Patch {
 	value?: any;
 }
 
+export type PatchSegment = string | number
+
+export interface PatchRedactionRule {
+	path: $ReadOnlyArray<PatchSegment>;
+	replacement: mixed;
+}
+
+export interface RedactPatchesOptions {
+	rules: $ReadOnlyArray<PatchRedactionRule>;
+}
+
+declare export class PatchRedactionError extends Error {}
+
+declare export function redactPatches(
+	patches: $ReadOnlyArray<Patch>,
+	options: RedactPatchesOptions
+): Patch[]
+
 export type PatchListener = (patches: Patch[], inversePatches: Patch[]) => void
 
 type Base = {...} | Array<any>

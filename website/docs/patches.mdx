@@ -225,3 +225,7 @@ Which produces:
 For a more in-depth study, see [Distributing patches and rebasing actions using Immer](https://medium.com/@mweststrate/distributing-state-changes-using-snapshots-patches-and-actions-part-2-2f50d8363988)
 
 Tip: Check this trick to [compress patches](https://medium.com/@david.b.edelstein/using-immer-to-compress-immer-patches-f382835b6c69) produced over time.
+
+## Redacting patches for audit logs
+
+When patches are written to audit logs, some of their values (tokens, passwords) should not be logged verbatim. Use [`redactPatches`](./audit-patches.mdx) to obtain a detached copy in which those values are replaced with an explicit marker, while ops and paths (including `remove` ops) stay intact and the original patches remain replayable.

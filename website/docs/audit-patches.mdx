@@ -1,0 +1,100 @@
+# Redacting patches for audit logs
+
+Patches are convenient to persist in audit logs because they record both the operation (`add` / `replace` / `remove`) and the exact path that changed. However, writing a patch's `value` to a log can leak secrets such as tokens or passwords. For that purpose Immer provides `redactPatches`, which returns a detached copy of a patch list in which sensitive values are masked.
+
+```javascript
+import {redactPatches} from "immer"
+
+const auditPatches = redactPatches(patches, {
+	rules: [{path: ["user", "token"], replacement: "[REDACTED]"}]
+})
+```
+
+Given the patches below:
+
+```javascript
+const patches = [
+	{op: "replace", path: ["user", "name"], value: "alice"},
+	{op: "replace", path: ["user", "token"], value: "super-secret-token"}
+]
+```
+
+`redactPatches` keeps `/user/name` but replaces the value at `/user/token`:
+
+```javascript
+;[
+	{op: "replace", path: ["user", "name"], value: "alice"},
+	{op: "replace", path: ["user", "token"], value: "[REDACTED]"}
+]
+```
+
+## Rules match path segments
+
+- A rule matches a patch when every segment of the rule's `path` equals the corresponding segment of the patch path, using strict (`SameValue`) equality. Matching is segment based, not string based: the numeric array segment `0` never matches the string field `"0"`.
+- A rule path that is a prefix of a patch path masks that patch: a **parent rule covers the whole `value` subtree**. For example the rule `{path: ["user"]}` masks `{op: "replace", path: ["user"], value: {...}}` entirely, so no nested `token` can leak, and it also masks deeper patches such as `["user", "profile", "email"]`.
+- When several rules match, the longest (most specific) rule wins; for rules with the same path the last one in the array takes precedence.
+- The empty rule path `[]` matches every patch.
+
+```javascript
+// masks the whole user object, the internal token never reaches the log
+const auditPatches = redactPatches(patches, {
+	rules: [{path: ["user"], replacement: "[REDACTED]"}]
+})
+```
+
+## The replacement marker is explicit
+
+There is no built-in default marker. Each rule must provide its own `replacement`, which is written into the redacted patch's `value`. The marker can be a primitive such as `"[REDACTED]"` or `null`, or any structured value; it is deep copied per redacted patch. An explicit `undefined` is honored.
+
+## Ops and paths are always preserved
+
+The returned patches keep the original `op` and `path` of every patch. A `remove` patch carries no `value`, so it is kept exactly as-is — removal events remain visible in the audit log while nothing sensitive is added.
+
+## The result shares no mutable object with the input
+
+Every copied value is a fresh deep clone, and each patch gets its own `path` array. Mutating the audit copy (or its marker) can never affect the original patches, and vice versa.
+
+## The original patches stay replayable
+
+`redactPatches` never mutates its input. The returned list is only a copy for logging; the original patches can still be applied with `applyPatches` to get the original result:
+
+```javascript
+import {applyPatches, redactPatches} from "immer"
+
+const auditPatches = redactPatches(patches, {rules})
+// logs use auditPatches...
+// ...while the original patches still reproduce the next state:
+const nextState = applyPatches(baseState, patches)
+```
+
+## Accessors and circular values reject the whole batch
+
+Patch values that contain a getter/setter (own or inherited enumerable accessor) or a circular reference cannot be copied into a safe snapshot. In that case `redactPatches` throws a `PatchRedactionError`, **the whole batch is rejected**, no partial result is returned, and the input is left untouched. (Plain DAGs, where one object is referenced from multiple branches, are supported and copied into independent branches.)
+
+```javascript
+import {PatchRedactionError} from "immer"
+
+try {
+	const auditPatches = redactPatches(patches, {rules})
+} catch (e) {
+	if (e instanceof PatchRedactionError) {
+		// refuse to log this batch
+	}
+}
+```
+
+## API
+
+```typescript
+interface PatchRedactionRule {
+	path: readonly (string | number)[]
+	replacement: unknown
+}
+
+function redactPatches(
+	patches: readonly Patch[],
+	options: {rules: readonly PatchRedactionRule[]}
+): Patch[]
+```
+
+A runnable example that prints a redacted audit entry is available in [`examples/audit-redaction`](https://github.com/immerjs/immer/blob/main/examples/audit-redaction/print-audit-copy.ts).

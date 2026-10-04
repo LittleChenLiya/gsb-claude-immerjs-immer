@@ -16,6 +16,7 @@ module.exports = {
 			"current",
 			"original",
 			"patches",
+			"audit-patches",
 			"freezing",
 			"return",
 			"async",
