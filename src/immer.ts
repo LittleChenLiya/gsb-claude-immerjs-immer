@@ -119,5 +119,7 @@ export let castImmutable = <T>(value: T): Immutable<T> => value as any
 export {Immer}
 
 export {enablePatches} from "./plugins/patches"
+export {maskPatches} from "./plugins/patchMask"
+export type {PatchMaskOptions} from "./plugins/patchMask"
 export {enableMapSet} from "./plugins/mapset"
 export {enableArrayMethods} from "./plugins/arrayMethods"

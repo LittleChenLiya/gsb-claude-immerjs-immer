@@ -1,0 +1,82 @@
+---
+id: patch-mask
+title: Masking patches for audit logs
+---
+
+When Immer is used to record changes, the generated [patches](./patches.mdx) contain the new values in clear. That is fine for replaying, but not for an audit log: a patch at `/user/token` may carry a secret that must not be written out.
+
+`maskPatches` produces an **audit-safe copy** of a batch of patches. The original patches are never mutated and can still be replayed with `applyPatches` to reproduce the original result.
+
+```js
+import {produceWithPatches, applyPatches, maskPatches} from "immer"
+
+const base = {user: {name: "Ada", token: "s3cr3t"}}
+
+const [nextState, patches] = produceWithPatches(base, draft => {
+	draft.user.name = "Ada Lovelace"
+	draft.user.token = "new-token"
+})
+
+const audit = maskPatches(patches, {
+	rules: ["/user/token"],
+	replacement: "***" // the marker, explicitly provided by the caller
+})
+
+console.log(JSON.stringify(audit, null, 2))
+// [
+//   { "op": "replace", "path": ["user", "name"], "value": "Ada Lovelace" },
+//   { "op": "replace", "path": ["user", "token"], "value": "***" }
+// ]
+
+// The original patches still replay to the original result:
+applyPatches(base, patches) // => nextState
+```
+
+### Rules
+
+Rules are matched **segment by segment**: a rule matches a patch when the rule path is a prefix of (or equal to) the patch path. A rule on a parent path covers the whole value subtree, so masking `/user` also masks `/user/token`, `/user/name`, and everything else under `/user`:
+
+```js
+maskPatches(patches, {rules: ["/user"], replacement: "***"})
+// every value under /user is replaced, no token leaks out
+```
+
+Rules can be given as JSON-Pointer-like strings (`"/user/token"`) or as arrays of path segments (`["user", "token"]`). Segments made of digits are interpreted as **array indices** (numbers), never as string fields: `"/items/0"` matches the patch path `["items", 0]` but not `["items", "0"]`. Use the array form if you need to match a string key that looks like an array index.
+
+An empty string or empty array matches every patch.
+
+### Operations and values
+
+- Every patch is copied: `op` and `path` are preserved.
+- The `value` of a matched patch is replaced by the caller-provided `replacement` marker.
+- `remove` patches have no `value`, but the operation is still preserved in the copy.
+- Values that are retained are deep-copied, so the audit copy never shares mutable objects with the original patches. Mutating the audit copy leaves the original patches untouched.
+
+### Rejected input
+
+The whole batch is validated before anything is returned. If any value contains **accessor properties** (getters/setters) or **cyclic references**, `maskPatches` throws and the entire batch is rejected — no partial copy is produced.
+
+```js
+const cyclic = {name: "Ada"}
+cyclic.self = cyclic
+
+maskPatches([{op: "add", path: ["user"], value: cyclic}], {
+	rules: [],
+	replacement: "***"
+})
+// throws: [Immer] maskPatches: circular reference detected ...
+```
+
+### `maskPatches`
+
+```ts
+function maskPatches(
+	patches: Patch[],
+	options: {
+		rules: (string | (string | number)[])[]
+		replacement: unknown
+	}
+): Patch[]
+```
+
+Returns a new array of new patch objects. The original patches are left untouched.
