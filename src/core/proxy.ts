@@ -17,6 +17,7 @@ import {
 	createProxy,
 	ArchType,
 	handleCrossReference,
+	assertDraftScope,
 	WRITABLE,
 	CONFIGURABLE,
 	ENUMERABLE,
@@ -171,6 +172,9 @@ export const objectTraps: ProxyHandler<ProxyState> = {
 		prop: string /* strictly not, but helps TS */,
 		value
 	) {
+		// Strict draft scope gate: must run before any mutation so a rejected
+		// assignment leaves the draft untouched and usable for further edits.
+		assertDraftScope(state, prop, value)
 		const desc = getDescriptorFromProto(latest(state), prop)
 		if (desc?.set) {
 			// special case: if this write is captured by a setter, we have

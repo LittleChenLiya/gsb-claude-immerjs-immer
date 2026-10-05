@@ -214,6 +214,69 @@ function generatePatchesAndFinalize(state: ImmerState, rootScope: ImmerScope) {
 	}
 }
 
+/**
+ * Strict draft scope gate.
+ *
+ * When the owning `Immer` instance has strict draft scope mode enabled
+ * (`useStrictDraftScope_`), an assignment that would store a draft owned by a
+ * *different*, still-open produce/createDraft scope into `target` is rejected
+ * with an error describing the write path and the source scope.
+ *
+ * Drafts owned by the same scope can still be shared freely, and finalized
+ * results are plain values (no longer drafts), so they always pass this gate.
+ *
+ * This must be called *before* the assignment mutates any draft state, so a
+ * rejected assignment leaves the current draft fully usable for further edits.
+ */
+export function assertDraftScope(
+	target: ImmerState,
+	key: string | number | symbol,
+	value: any
+) {
+	const scope = target.scope_
+	if (!scope.immer_.useStrictDraftScope_) return
+	if (!isDraft(value)) return
+	const valueState: ImmerState = value[DRAFT_STATE]
+	if (isSameScope(valueState, scope)) return
+	// A revoked scope has its `drafts_` nulled out; its drafts are inert, so
+	// only drafts whose owning scope is still open are rejected here.
+	if (valueState.scope_.drafts_ != null) {
+		die(16, buildWritePath(target, key), describeScope(valueState.scope_))
+	}
+}
+
+// Builds a readable `draft.a[0].b` style path from the root draft down to the
+// property being written, used in strict draft scope error messages.
+function buildWritePath(
+	target: ImmerState,
+	key: string | number | symbol
+): string {
+	const segments: (string | number | symbol)[] = []
+	let node: ImmerState | undefined = target
+	while (node) {
+		if (node.key_ !== undefined) segments.unshift(node.key_)
+		node = node.parent_
+	}
+	segments.push(key)
+	let path = "draft"
+	for (const segment of segments) {
+		path +=
+			typeof segment === "number" ||
+			(typeof segment === "string" && /^\d+$/.test(segment))
+				? `[${String(segment)}]`
+				: `.${String(segment)}`
+	}
+	return path
+}
+
+// Describes a scope for error messages, e.g. "scope #3 (createDraft)".
+function describeScope(scope: ImmerScope): string {
+	const rootDraft = scope.drafts_?.[0]
+	const rootState: ImmerState | undefined = rootDraft?.[DRAFT_STATE]
+	const origin = rootState?.isManual_ ? "createDraft" : "produce"
+	return `scope #${scope.id_} (${origin})`
+}
+
 export function handleCrossReference(
 	target: ImmerState,
 	key: string | number | symbol,

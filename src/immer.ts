@@ -79,6 +79,15 @@ export const setUseStrictIteration =
 	/* @__PURE__ */ immer.setUseStrictIteration.bind(immer)
 
 /**
+ * Pass true to enable strict draft scope mode: assigning a draft owned by
+ * another, still-open produce/createDraft scope into the current draft throws.
+ *
+ * By default, strict draft scope mode is disabled.
+ */
+export const setUseStrictDraftScope =
+	/* @__PURE__ */ immer.setUseStrictDraftScope.bind(immer)
+
+/**
  * Apply an array of Immer patches to the first argument.
  *
  * This function is a producer, which means copy-on-write is in effect.

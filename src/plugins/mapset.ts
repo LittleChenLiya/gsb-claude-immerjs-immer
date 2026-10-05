@@ -17,7 +17,8 @@ import {
 	each,
 	getValue,
 	PluginMapSet,
-	handleCrossReference
+	handleCrossReference,
+	assertDraftScope
 } from "../internal"
 
 // Feature-detect `Iterator.from` (added in ES2025) without augmenting the
@@ -64,6 +65,8 @@ export function enableMapSet() {
 		set(key: any, value: any) {
 			const state: MapState = this[DRAFT_STATE]
 			assertUnrevoked(state)
+			// Strict draft scope gate, before any mutation (see proxy set trap)
+			assertDraftScope(state, key, value)
 			if (!latest(state).has(key) || latest(state).get(key) !== value) {
 				prepareMapCopy(state)
 				markChanged(state)
@@ -244,6 +247,8 @@ export function enableMapSet() {
 		add(value: any): any {
 			const state: SetState = this[DRAFT_STATE]
 			assertUnrevoked(state)
+			// Strict draft scope gate, before any mutation (see proxy set trap)
+			assertDraftScope(state, value, value)
 			if (!this.has(value)) {
 				prepareSetCopy(state)
 				markChanged(state)

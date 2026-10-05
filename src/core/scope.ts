@@ -19,6 +19,8 @@ import {
 /** Each scope represents a `produce` call. */
 
 export interface ImmerScope {
+	/** Diagnostic id, reported by strict draft scope errors. */
+	id_: number
 	patches_?: Patch[]
 	inversePatches_?: Patch[]
 	patchPlugin_?: PatchesPlugin
@@ -38,10 +40,13 @@ let currentScope: ImmerScope | undefined
 
 export let getCurrentScope = () => currentScope!
 
+let nextScopeId = 1
+
 let createScope = (
 	parent_: ImmerScope | undefined,
 	immer_: Immer
 ): ImmerScope => ({
+	id_: nextScopeId++,
 	drafts_: [],
 	parent_,
 	immer_,

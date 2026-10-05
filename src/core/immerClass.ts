@@ -48,17 +48,21 @@ export class Immer implements ProducersFns {
 	autoFreeze_: boolean = true
 	useStrictShallowCopy_: StrictMode = false
 	useStrictIteration_: boolean = false
+	useStrictDraftScope_: boolean = false
 
 	constructor(config?: {
 		autoFreeze?: boolean
 		useStrictShallowCopy?: StrictMode
 		useStrictIteration?: boolean
+		useStrictDraftScope?: boolean
 	}) {
 		if (isBoolean(config?.autoFreeze)) this.setAutoFreeze(config!.autoFreeze)
 		if (isBoolean(config?.useStrictShallowCopy))
 			this.setUseStrictShallowCopy(config!.useStrictShallowCopy)
 		if (isBoolean(config?.useStrictIteration))
 			this.setUseStrictIteration(config!.useStrictIteration)
+		if (isBoolean(config?.useStrictDraftScope))
+			this.setUseStrictDraftScope(config!.useStrictDraftScope)
 	}
 
 	/**
@@ -196,6 +200,20 @@ export class Immer implements ProducersFns {
 	 */
 	setUseStrictIteration(value: boolean) {
 		this.useStrictIteration_ = value
+	}
+
+	/**
+	 * Pass true to enable strict draft scope mode.
+	 *
+	 * In strict draft scope mode, assigning a draft that is owned by another,
+	 * still-open produce/createDraft scope into the current draft throws an
+	 * error reporting the write path and the source scope. Sharing drafts
+	 * within the same scope and assigning finalized plain values stays allowed.
+	 *
+	 * By default, strict draft scope mode is disabled.
+	 */
+	setUseStrictDraftScope(value: boolean) {
+		this.useStrictDraftScope_ = value
 	}
 
 	shouldUseStrictIteration(): boolean {

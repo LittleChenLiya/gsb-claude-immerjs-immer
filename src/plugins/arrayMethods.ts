@@ -5,6 +5,7 @@ import {
 	markChanged,
 	prepareCopy,
 	handleCrossReference,
+	assertDraftScope,
 	ProxyArrayState
 } from "../internal"
 
@@ -233,6 +234,21 @@ export function enableArrayMethods() {
 	}
 
 	/**
+	 * Strict draft scope gate for values about to be inserted by push/unshift/
+	 * splice. Runs before the copy is mutated, so a rejected insertion leaves
+	 * the draft untouched and usable for further edits.
+	 */
+	function assertInsertedValues(
+		state: ProxyArrayState,
+		startIndex: number,
+		values: any[]
+	) {
+		for (let i = 0; i < values.length; i++) {
+			assertDraftScope(state, startIndex + i, values[i])
+		}
+	}
+
+	/**
 	 * Handles mutating operations that add/remove elements (push, pop, shift, unshift, splice).
 	 *
 	 * Operates directly on `state.copy_` without creating per-element proxies.
@@ -256,6 +272,15 @@ export function enableArrayMethods() {
 			// Match the native return values: push/unshift return the
 			// (unchanged) length, pop/shift on an empty array return undefined
 			return isInsert ? latest(state).length : undefined
+		}
+
+		// Strict draft scope gate: reject foreign drafts before mutating
+		if (isInsert) {
+			assertInsertedValues(
+				state,
+				method === "push" ? latest(state).length : 0,
+				args
+			)
 		}
 
 		prepareCopy(state)
@@ -374,6 +399,16 @@ export function enableArrayMethods() {
 							) {
 								return []
 							}
+						}
+
+						// Strict draft scope gate: reject foreign drafts
+						// before mutating the copy
+						if (insertCount > 0) {
+							assertInsertedValues(
+								state,
+								normalizeSliceIndex(args[0] ?? 0, latest(state).length),
+								args.slice(2)
+							)
 						}
 
 						prepareCopy(state)

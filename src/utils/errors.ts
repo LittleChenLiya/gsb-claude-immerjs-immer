@@ -32,6 +32,9 @@ export const errors =
 				"Immer only supports setting array indices and the 'length' property",
 				function (thing: string) {
 					return `'original' expects a draft, got: ${thing}`
+				},
+				function (path: string, source: string) {
+					return `Cannot assign a draft owned by ${source} into the current draft at '${path}'. Strict draft scope mode forbids storing a draft from another produce/createDraft scope while that scope is still open. Finalize the other draft first (e.g. with 'finishDraft') and assign its plain result instead, or keep shared references within a single scope.`
 				}
 				// Note: if more errors are added, the errorOffset in Patches.ts should be increased
 				// See Patches.ts for additional errors
