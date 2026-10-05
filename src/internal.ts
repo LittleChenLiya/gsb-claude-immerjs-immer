@@ -1,5 +1,6 @@
 export * from "./utils/env"
 export * from "./utils/errors"
+export * from "./utils/rfc6902"
 export * from "./types/types-external"
 export * from "./types/types-internal"
 export * from "./utils/common"

@@ -121,3 +121,5 @@ export {Immer}
 export {enablePatches} from "./plugins/patches"
 export {enableMapSet} from "./plugins/mapset"
 export {enableArrayMethods} from "./plugins/arrayMethods"
+export {patchesToRFC6902, RFC6902ConversionError} from "./utils/rfc6902"
+export type {RFC6902Operation} from "./utils/rfc6902"
