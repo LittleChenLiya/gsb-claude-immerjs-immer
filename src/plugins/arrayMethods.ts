@@ -5,6 +5,7 @@ import {
 	markChanged,
 	prepareCopy,
 	handleCrossReference,
+	assertDraftScope,
 	ProxyArrayState
 } from "../internal"
 
@@ -264,6 +265,17 @@ export function enableArrayMethods() {
 		// so we can compute insertion indices for handleCrossReference
 		const lengthBefore = state.copy_!.length
 
+		// Reject cross-scope draft assignments before any mutation.
+		if (method === "push" || method === "unshift") {
+			for (let i = 0; i < args.length; i++) {
+				assertDraftScope(
+					state,
+					method === "push" ? lengthBefore + i : i,
+					args[i]
+				)
+			}
+		}
+
 		const result = (state.copy_! as any)[method](...args)
 
 		markArrayChanged(state)
@@ -377,6 +389,16 @@ export function enableArrayMethods() {
 						}
 
 						prepareCopy(state)
+						// Reject cross-scope draft assignments before any mutation.
+						if (insertCount > 0) {
+							const startIndex = normalizeSliceIndex(
+								args[0] ?? 0,
+								latest(state).length
+							)
+							for (let i = 0; i < insertCount; i++) {
+								assertDraftScope(state, startIndex + i, args[2 + i])
+							}
+						}
 						const res = state.copy_!.splice(
 							...(args as [number, number, ...any[]])
 						)

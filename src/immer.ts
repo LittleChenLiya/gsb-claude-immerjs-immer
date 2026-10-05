@@ -79,6 +79,20 @@ export const setUseStrictIteration =
 	/* @__PURE__ */ immer.setUseStrictIteration.bind(immer)
 
 /**
+ * Pass true to enable strict draft mode.
+ *
+ * When enabled, assigning a draft that is still alive and owned by a different
+ * `produce` / `createDraft` scope into the current draft is rejected. This
+ * prevents dangling references to drafts that are revoked once their owning
+ * scope finalizes. Same-scope shared references and plain values (including the
+ * finalized result of another scope) are always allowed.
+ *
+ * By default, strict draft mode is disabled.
+ */
+export const setUseStrictDrafts =
+	/* @__PURE__ */ immer.setUseStrictDrafts.bind(immer)
+
+/**
  * Apply an array of Immer patches to the first argument.
  *
  * This function is a producer, which means copy-on-write is in effect.

@@ -32,6 +32,9 @@ export const errors =
 				"Immer only supports setting array indices and the 'length' property",
 				function (thing: string) {
 					return `'original' expects a draft, got: ${thing}`
+				},
+				function (path: string, scope: string) {
+					return `Cross-scope draft assignment rejected: a draft from ${scope} cannot be written to "${path}" while its owning scope is still active. Finalize the source draft first or assign a plain (non-draft) value.`
 				}
 				// Note: if more errors are added, the errorOffset in Patches.ts should be increased
 				// See Patches.ts for additional errors

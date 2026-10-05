@@ -19,6 +19,12 @@ import {
 /** Each scope represents a `produce` call. */
 
 export interface ImmerScope {
+	/**
+	 * Monotonically increasing identifier, unique per `produce` / `createDraft`
+	 * call. Used to report which owning scope a foreign draft belongs to in
+	 * strict draft mode.
+	 */
+	id_: number
 	patches_?: Patch[]
 	inversePatches_?: Patch[]
 	patchPlugin_?: PatchesPlugin
@@ -38,10 +44,15 @@ let currentScope: ImmerScope | undefined
 
 export let getCurrentScope = () => currentScope!
 
+// Sequence counter for scope ids. Only used for diagnostics, not for identity
+// checks, so a module-level counter is sufficient.
+let scopeSequence = 0
+
 let createScope = (
 	parent_: ImmerScope | undefined,
 	immer_: Immer
 ): ImmerScope => ({
+	id_: ++scopeSequence,
 	drafts_: [],
 	parent_,
 	immer_,

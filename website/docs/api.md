@@ -33,6 +33,7 @@ title: API overview
 | `setAutoFreeze` | Enables / disables automatic freezing of the trees produces. By default enabled. | [Freezing](./freezing.mdx) |
 | `setUseStrictShallowCopy` | Can be used to enable strict shallow copy. If enable, immer copies non-enumerable properties as much as possible. | [Classes](./complex-objects.md) |
 | `setUseStrictIteration` | Controls iteration behavior: pass `false` for loose iteration (enumerable properties only, better performance) or `true` for strict iteration (includes symbols and non-enumerable properties). By default disabled (loose iteration). |  |
+| `setUseStrictDrafts` | Enables / disables strict draft mode. When enabled, assigning a live draft from another `produce` / `createDraft` scope is rejected. By default disabled. | [Strict draft mode](./strict-drafts.md) |
 
 ## Importing immer
 

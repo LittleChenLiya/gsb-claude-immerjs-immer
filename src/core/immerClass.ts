@@ -48,17 +48,21 @@ export class Immer implements ProducersFns {
 	autoFreeze_: boolean = true
 	useStrictShallowCopy_: StrictMode = false
 	useStrictIteration_: boolean = false
+	useStrictDrafts_: boolean = false
 
 	constructor(config?: {
 		autoFreeze?: boolean
 		useStrictShallowCopy?: StrictMode
 		useStrictIteration?: boolean
+		useStrictDrafts?: boolean
 	}) {
 		if (isBoolean(config?.autoFreeze)) this.setAutoFreeze(config!.autoFreeze)
 		if (isBoolean(config?.useStrictShallowCopy))
 			this.setUseStrictShallowCopy(config!.useStrictShallowCopy)
 		if (isBoolean(config?.useStrictIteration))
 			this.setUseStrictIteration(config!.useStrictIteration)
+		if (isBoolean(config?.useStrictDrafts))
+			this.setUseStrictDrafts(config!.useStrictDrafts)
 	}
 
 	/**
@@ -200,6 +204,24 @@ export class Immer implements ProducersFns {
 
 	shouldUseStrictIteration(): boolean {
 		return this.useStrictIteration_
+	}
+
+	/**
+	 * Pass true to enable strict draft mode.
+	 *
+	 * When enabled, assigning a draft that is still alive and owned by a
+	 * different `produce` / `createDraft` scope into the current draft is
+	 * rejected with an error reporting the write path and the owning scope.
+	 * This prevents dangling references to drafts that will be revoked once
+	 * their owning scope finalizes.
+	 *
+	 * Shared references within the same scope are always allowed, as are plain
+	 * values (including the finalized result of another scope).
+	 *
+	 * By default, strict draft mode is disabled.
+	 */
+	setUseStrictDrafts(value: boolean) {
+		this.useStrictDrafts_ = value
 	}
 
 	applyPatches<T extends Objectish>(base: T, patches: readonly Patch[]): T {

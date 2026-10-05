@@ -17,7 +17,8 @@ import {
 	each,
 	getValue,
 	PluginMapSet,
-	handleCrossReference
+	handleCrossReference,
+	assertDraftScope
 } from "../internal"
 
 // Feature-detect `Iterator.from` (added in ES2025) without augmenting the
@@ -27,9 +28,8 @@ import {
 // while keeping the runtime feature detect accurate. (#1273)
 const _globalIterator = (globalThis as any).Iterator as
 	| undefined
-	| { from: <T>(iterable: Iterator<T>) => IterableIterator<T> }
-const hasIteratorFrom =
-	typeof _globalIterator?.from === "function"
+	| {from: <T>(iterable: Iterator<T>) => IterableIterator<T>}
+const hasIteratorFrom = typeof _globalIterator?.from === "function"
 
 export function enableMapSet() {
 	class DraftMap extends Map {
@@ -64,6 +64,8 @@ export function enableMapSet() {
 		set(key: any, value: any) {
 			const state: MapState = this[DRAFT_STATE]
 			assertUnrevoked(state)
+			// Reject cross-scope draft assignments before any mutation.
+			assertDraftScope(state, key, value)
 			if (!latest(state).has(key) || latest(state).get(key) !== value) {
 				prepareMapCopy(state)
 				markChanged(state)
@@ -244,6 +246,8 @@ export function enableMapSet() {
 		add(value: any): any {
 			const state: SetState = this[DRAFT_STATE]
 			assertUnrevoked(state)
+			// Reject cross-scope draft assignments before any mutation.
+			assertDraftScope(state, value, value)
 			if (!this.has(value)) {
 				prepareSetCopy(state)
 				markChanged(state)

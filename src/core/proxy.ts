@@ -22,7 +22,8 @@ import {
 	ENUMERABLE,
 	VALUE,
 	isArray,
-	isArrayIndex
+	isArrayIndex,
+	assertDraftScope
 } from "../internal"
 
 interface ProxyBaseState extends ImmerBaseState {
@@ -171,6 +172,10 @@ export const objectTraps: ProxyHandler<ProxyState> = {
 		prop: string /* strictly not, but helps TS */,
 		value
 	) {
+		// Reject cross-scope draft assignments before any mutation so that a
+		// failed write leaves the current draft usable for other edits.
+		assertDraftScope(state, prop, value)
+
 		const desc = getDescriptorFromProto(latest(state), prop)
 		if (desc?.set) {
 			// special case: if this write is captured by a setter, we have

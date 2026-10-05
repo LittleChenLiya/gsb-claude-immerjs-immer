@@ -17,6 +17,7 @@ module.exports = {
 			"original",
 			"patches",
 			"freezing",
+			"strict-drafts",
 			"return",
 			"async",
 			"typescript"
