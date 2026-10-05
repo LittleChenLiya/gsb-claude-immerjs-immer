@@ -31,6 +31,7 @@
     "test:flow": "yarn flow check __tests__/flow",
     "test:build": "yarn build && vitest run --config vitest.config.build.ts",
     "test:src": "vitest run",
+    "test:rfc6902": "vitest run __tests__/rfc6902.js",
     "watch": "vitest",
     "coverage": "vitest run --coverage",
     "coveralls": "vitest run --coverage && cat ./coverage/lcov.info | ./node_modules/.bin/coveralls && rm -rf ./coverage",
